@@ -1,5 +1,6 @@
 package com.edu.cqie.oj.controller;
 
+import com.edu.cqie.oj.annotation.RequiresPermission;
 import com.edu.cqie.oj.domain.Result;
 import com.edu.cqie.oj.service.impl.SubmissionServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,11 +21,13 @@ public class JudgeController extends BaseController {
 
     /**
      * 同步判题结果
+     * 仅管理员可调用（内部服务调用也应使用管理员Token）
      *
      * @param submissionId 提交记录ID
      * @return 同步结果
      */
     @PostMapping("/sync/{submissionId}")
+    @RequiresPermission("submission:update")
     public Result<Boolean> syncJudgeResult(@PathVariable Integer submissionId) {
         boolean success = submissionService.syncJudgeResult(submissionId);
         if (success) {
