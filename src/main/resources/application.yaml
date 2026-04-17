@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: onlineJudge-ACM
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:13306/clzj_home?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: clzj_user
+    password: Clzj@2024!ReadWrite
+
+# 可选：启用SQL日志
+logging:
+  level:
+    com.clzj.clzjhome: DEBUG
+    org.mybatis: DEBUG
+
+# HydroOJ 判题系统配置
+hydro:
+  judge:
+    # HydroOJ API 基础URL（根据实际部署地址修改）
+    base-url: http://localhost:8888
+    # API Token（需要在HydroOJ中创建）
+    api-token: your-hydro-api-token-here
+    # 连接超时时间（毫秒）
+    connect-timeout: 5000
+    # 读取超时时间（毫秒）
+    read-timeout: 30000
+    # 写入超时时间（毫秒）
+    write-timeout: 30000
