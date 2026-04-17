@@ -2,8 +2,6 @@ package com.edu.cqie.oj.controller;
 
 import com.edu.cqie.oj.domain.Result;
 import com.edu.cqie.oj.service.impl.SubmissionServiceImpl;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
  * @author system
  * @since 1.0
  */
-@Tag(name = "判题管理")
 @RestController
 @RequestMapping("/api/judge")
 public class JudgeController extends BaseController {
@@ -27,7 +24,6 @@ public class JudgeController extends BaseController {
      * @param submissionId 提交记录ID
      * @return 同步结果
      */
-    @Operation(summary = "同步判题结果")
     @PostMapping("/sync/{submissionId}")
     public Result<Boolean> syncJudgeResult(@PathVariable Integer submissionId) {
         boolean success = submissionService.syncJudgeResult(submissionId);

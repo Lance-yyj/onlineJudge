@@ -4,10 +4,8 @@
 
 -- 1. 插入基础角色
 INSERT INTO `role` (`role_name`, `description`, `created_at`, `updated_at`) VALUES
-('超级管理员', '拥有系统所有权限', NOW(), NOW()),
-('教师', '可以管理题目、比赛和查看学生提交', NOW(), NOW()),
-('学生', '可以做题、参加比赛和查看自己的提交', NOW(), NOW()),
-('访客', '只能查看公开信息', NOW(), NOW());
+('管理员', '拥有系统所有权限，可以管理用户、题目、比赛等', NOW(), NOW()),
+('学生', '可以做题、参加比赛和查看自己的提交记录', NOW(), NOW());
 
 -- 2. 插入权限（方法级别）
 -- 用户管理权限
@@ -66,24 +64,13 @@ INSERT INTO `permission` (`permission_name`, `description`, `permission_code`, `
 ('更新公告', '修改公告', 'announcement:update', 'announcement', NOW()),
 ('删除公告', '删除公告', 'announcement:delete', 'announcement', NOW());
 
--- 3. 为超级管理员分配所有权限（假设角色ID=1）
+-- 3. 为管理员分配所有权限（假设角色ID=1）
 INSERT INTO `role_permission` (`role_id`, `permission_id`, `created_at`)
 SELECT 1, id, NOW() FROM `permission`;
 
--- 4. 为教师分配相应权限（假设角色ID=2）
+-- 4. 为学生分配相应权限（假设角色ID=2）
 INSERT INTO `role_permission` (`role_id`, `permission_id`, `created_at`)
 SELECT 2, id, NOW() FROM `permission` 
-WHERE `permission_code` IN (
-    'problem:create', 'problem:list', 'problem:view', 'problem:update', 'problem:delete',
-    'contest:create', 'contest:list', 'contest:view', 'contest:update', 'contest:delete',
-    'contest:assign-problem', 'contest:view-problem', 'contest:remove-problem',
-    'submission:list', 'submission:view', 'submission:update',
-    'announcement:create', 'announcement:list', 'announcement:view', 'announcement:update', 'announcement:delete'
-);
-
--- 5. 为学生分配相应权限（假设角色ID=3）
-INSERT INTO `role_permission` (`role_id`, `permission_id`, `created_at`)
-SELECT 3, id, NOW() FROM `permission` 
 WHERE `permission_code` IN (
     'problem:list', 'problem:view',
     'contest:list', 'contest:view', 'contest:view-problem',
@@ -91,27 +78,27 @@ WHERE `permission_code` IN (
     'announcement:list', 'announcement:view'
 );
 
--- 6. 为访客分配相应权限（假设角色ID=4）
-INSERT INTO `role_permission` (`role_id`, `permission_id`, `created_at`)
-SELECT 4, id, NOW() FROM `permission` 
-WHERE `permission_code` IN (
-    'problem:list', 'problem:view',
-    'contest:list', 'contest:view',
-    'announcement:list', 'announcement:view'
-);
-
 -- 7. 创建默认管理员账号（密码: admin123，使用BCrypt加密）
 -- BCrypt hash for 'admin123': $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
 INSERT INTO `user` (`username`, `password`, `email`, `real_name`, `status`, `last_login_time`, `created_at`, `updated_at`) VALUES
-('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'admin@cqie.edu.cn', '系统管理员', 1, NOW(), NOW(), NOW());
+('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'admin@cqie.edu.cn', '系统管理员', 1, NOW(), NOW(), NOW()),
+('student', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'student@cqie.edu.cn', '测试学生', 1, NOW(), NOW(), NOW());
 
--- 8. 将管理员账号分配超级管理员角色（假设用户ID=1，角色ID=1）
+-- 8. 将管理员账号分配管理员角色（假设用户ID=1，角色ID=1）
 INSERT INTO `user_role` (`user_id`, `role_id`, `created_at`) VALUES (1, 1, NOW());
+
+-- 9. 将学生账号分配学生角色（假设用户ID=2，角色ID=2）
+INSERT INTO `user_role` (`user_id`, `role_id`, `created_at`) VALUES (2, 2, NOW());
 
 -- =============================================
 -- 说明：
--- 1. 默认管理员账号：admin / admin123
+-- 1. 默认账号信息：
+--    - 管理员：admin / admin123 （拥有所有权限）
+--    - 学生：student / admin123 （仅可查看题目、比赛、提交代码）
 -- 2. 权限代码格式：模块:操作，如 user:create
 -- 3. 支持AND/OR逻辑关系进行权限组合
 -- 4. 所有接口默认需要登录，除非明确标注 requireLogin = false
+-- 5. 角色说明：
+--    - 管理员(ID=1): 拥有所有权限，可管理用户、题目、比赛、公告等
+--    - 学生(ID=2): 可查看题目和比赛、提交代码、查看自己的提交记录
 -- =============================================
