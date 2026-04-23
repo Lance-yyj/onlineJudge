@@ -106,6 +106,12 @@ public class ProblemEntity {
     private Integer visible;
 
     /**
+     * Hydro OJ题目ID（用于判题系统同步）
+     */
+    @Column(value = "hydro_problem_id")
+    private String hydroProblemId;
+
+    /**
      * 提交次数
      */
     @Column(value = "submission_count")

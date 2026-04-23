@@ -91,4 +91,19 @@ public class ProblemController extends BaseController{
         boolean result = problemService.deleteProblem(id);
         return Result.success(result);
     }
+
+    /**
+     * 同步题目的Hydro OJ ID
+     * 用于在Hydro后台手动创建题目后，将Hydro的题目ID同步到本地
+     *
+     * @param problemId 本地题目ID
+     * @param hydroProblemId Hydro OJ题目ID
+     * @return Result<Boolean>
+     */
+    @PostMapping("/syncHydroProblemId")
+    @RequiresPermission("problem:update")
+    public Result<Boolean> syncHydroProblemId(Integer problemId, String hydroProblemId) {
+        boolean result = problemService.syncHydroProblemId(problemId, hydroProblemId);
+        return Result.success(result);
+    }
 }

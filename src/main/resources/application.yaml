@@ -18,6 +18,7 @@ hydro:
   judge:
     # HydroOJ API 基础URL
     # Java 应用运行在宿主机上，直接使用 localhost
+    # HydroOJ 使用 domain system 架构，路径为 /d/system/
     base-url: http://127.0.0.1:80
     # API Token（如果HydroOJ不需要认证，可以留空）
     api-token: ""

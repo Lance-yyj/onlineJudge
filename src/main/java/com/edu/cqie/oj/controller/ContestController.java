@@ -3,6 +3,7 @@ package com.edu.cqie.oj.controller;
 import com.edu.cqie.oj.annotation.RequiresPermission;
 import com.edu.cqie.oj.domain.Result;
 import com.edu.cqie.oj.domain.dto.ContestAddDto;
+import com.edu.cqie.oj.domain.dto.ContestUpdateDto;
 import com.edu.cqie.oj.domain.entity.ContestEntity;
 import com.edu.cqie.oj.domain.vo.ContestListVo;
 import jakarta.annotation.Resource;
@@ -85,13 +86,13 @@ public class ContestController extends BaseController{
     /**
      * 更新比赛
      *
-     * @param contest 比赛实体
+     * @param contestUpdateDto 比赛更新DTO
      * @return Result<Boolean>
      */
     @PostMapping("/updateContest")
     @RequiresPermission("contest:update")
-    public Result<Boolean> updateContest(@RequestBody ContestEntity contest) {
-        boolean result = contestService.updateContest(contest);
+    public Result<Boolean> updateContest(@RequestBody ContestUpdateDto contestUpdateDto) {
+        boolean result = contestService.updateContest(contestUpdateDto);
         return Result.success(result);
     }
 

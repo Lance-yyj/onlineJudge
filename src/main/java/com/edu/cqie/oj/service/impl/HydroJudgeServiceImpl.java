@@ -39,10 +39,10 @@ public class HydroJudgeServiceImpl implements IHydroJudgeService {
     static {
         LANGUAGE_MAP.put("C", "c");
         LANGUAGE_MAP.put("C++", "cc");
-        LANGUAGE_MAP.put("CPP", "cpp");
+        LANGUAGE_MAP.put("CPP", "cc");
         LANGUAGE_MAP.put("Java", "java");
-        LANGUAGE_MAP.put("Python", "python");
-        LANGUAGE_MAP.put("Python3", "python3");
+        LANGUAGE_MAP.put("Python", "py");
+        LANGUAGE_MAP.put("Python3", "py3");
         LANGUAGE_MAP.put("JavaScript", "js");
         LANGUAGE_MAP.put("Go", "go");
         LANGUAGE_MAP.put("Rust", "rust");

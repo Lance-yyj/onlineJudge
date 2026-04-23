@@ -3,6 +3,7 @@ package com.edu.cqie.oj.domain.vo;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 用户登录响应VO
@@ -49,4 +50,14 @@ public class UserLoginVo {
      * 最后登录时间
      */
     private Date lastLoginTime;
+
+    /**
+     * 角色名称列表
+     */
+    private List<String> roleNames;
+
+    /**
+     * 权限代码列表
+     */
+    private List<String> permissions;
 }

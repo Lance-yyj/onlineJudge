@@ -2,10 +2,14 @@ package com.edu.cqie.oj.service.impl;
 
 
 import com.edu.cqie.oj.domain.dto.UserRoleAssignDto;
+import com.edu.cqie.oj.domain.entity.PermissionEntity;
 import com.edu.cqie.oj.domain.entity.RoleEntity;
+import com.edu.cqie.oj.domain.entity.RolePermissionEntity;
 import com.edu.cqie.oj.domain.entity.UserEntity;
 import com.edu.cqie.oj.domain.vo.UserRoleVo;
+import com.edu.cqie.oj.mapper.PermissionMapper;
 import com.edu.cqie.oj.mapper.RoleMapper;
+import com.edu.cqie.oj.mapper.RolePermissionMapper;
 import com.edu.cqie.oj.mapper.UserMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.stereotype.Service;
@@ -21,6 +25,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.edu.cqie.oj.domain.entity.table.PermissionEntityTableDef.PERMISSION_ENTITY;
+import static com.edu.cqie.oj.domain.entity.table.RolePermissionEntityTableDef.ROLE_PERMISSION_ENTITY;
+
 /**
  * 服务层实现。
  *
@@ -35,6 +42,12 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRoleEnt
 
     @Resource
     private RoleMapper roleMapper;
+
+    @Resource
+    private RolePermissionMapper rolePermissionMapper;
+
+    @Resource
+    private PermissionMapper permissionMapper;
 
     /**
      * 为用户分配角色
@@ -116,9 +129,36 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRoleEnt
                 }
             }
             vo.setRoleNames(roleNames);
+
+            // 查询用户的所有权限
+            QueryWrapper rolePermissionQuery = QueryWrapper.create()
+                    .from(ROLE_PERMISSION_ENTITY)
+                    .where(ROLE_PERMISSION_ENTITY.ROLE_ID.in(roleIds));
+            List<RolePermissionEntity> rolePermissions = rolePermissionMapper.selectListByQuery(rolePermissionQuery);
+            
+            if (rolePermissions != null && !rolePermissions.isEmpty()) {
+                List<Integer> permissionIds = rolePermissions.stream()
+                        .map(RolePermissionEntity::getPermissionId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                
+                QueryWrapper permissionQuery = QueryWrapper.create()
+                        .from(PERMISSION_ENTITY)
+                        .where(PERMISSION_ENTITY.ID.in(permissionIds));
+                List<PermissionEntity> permissions = permissionMapper.selectListByQuery(permissionQuery);
+                
+                List<String> permissionCodes = permissions.stream()
+                        .map(PermissionEntity::getPermissionCode)
+                        .distinct()
+                        .collect(Collectors.toList());
+                vo.setPermissions(permissionCodes);
+            } else {
+                vo.setPermissions(new ArrayList<>());
+            }
         } else {
             vo.setRoleIds(new ArrayList<>());
             vo.setRoleNames(new ArrayList<>());
+            vo.setPermissions(new ArrayList<>());
         }
 
         return vo;

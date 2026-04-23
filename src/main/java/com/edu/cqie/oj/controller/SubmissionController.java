@@ -119,12 +119,12 @@ public class SubmissionController extends BaseController{
      * @param status 状态
      * @param executeTime 执行时间
      * @param executeMemory 内存使用
-     * @param judgeResult 判题结果
+     * @param judgeResult 判题结果（JSON格式字符串）
      * @return Result<Boolean>
      */
     @PostMapping("/updateSubmissionStatus")
     @RequiresPermission("submission:update")
-    public Result<Boolean> updateSubmissionStatus(Integer id, Integer status, Integer executeTime, Integer executeMemory, Object judgeResult) {
+    public Result<Boolean> updateSubmissionStatus(Integer id, Integer status, Integer executeTime, Integer executeMemory, String judgeResult) {
         boolean result = submissionService.updateSubmissionStatus(id, status, executeTime, executeMemory, judgeResult);
         return Result.success(result);
     }

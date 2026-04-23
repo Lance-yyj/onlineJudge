@@ -110,10 +110,17 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
         
         // 提交到 HydroOJ 进行判题
         try {
+            // 获取题目的Hydro题目ID
+            String hydroPid = problem.getHydroProblemId();
+            if (hydroPid == null || hydroPid.isEmpty()) {
+                // 如果没有设置Hydro题目ID，使用本地ID
+                hydroPid = String.valueOf(submission.getProblemId());
+                log.warn("题目 {} 未设置Hydro题目ID，使用本地ID: {}", submission.getProblemId(), hydroPid);
+            }
+            
             // 调用 HydroOJ API 提交代码
-            String pid = String.valueOf(submission.getProblemId());
             HydroJudgeResponse response = hydroJudgeService.submitCode(
-                    pid,
+                    hydroPid,
                     submission.getLanguage(),
                     submission.getCode()
             );
@@ -128,7 +135,8 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
             log.error("提交到 HydroOJ 失败，将状态设为失败", e);
             // 提交失败，设置为失败状态
             submission.setStatus(3);
-            submission.setJudgeResult("提交到判题系统失败: " + e.getMessage());
+            // judge_result 必须是有效的 JSON 格式
+            submission.setJudgeResult("{\"error\":\"提交到判题系统失败: " + e.getMessage().replace("\"", "\\\"") + "\"}");
             updateById(submission);
         }
         
@@ -222,12 +230,12 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
      * @param status 状态
      * @param executeTime 执行时间
      * @param executeMemory 内存使用
-     * @param judgeResult 判题结果
+     * @param judgeResult 判题结果（JSON格式字符串）
      * @return boolean
      */
     @Override
     @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
-    public boolean updateSubmissionStatus(Integer id, Integer status, Integer executeTime, Integer executeMemory, Object judgeResult) {
+    public boolean updateSubmissionStatus(Integer id, Integer status, Integer executeTime, Integer executeMemory, String judgeResult) {
         SubmissionEntity submission = getById(id);
         if (submission == null) {
             return false;

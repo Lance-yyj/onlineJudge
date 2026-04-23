@@ -2,6 +2,7 @@ package com.edu.cqie.oj.service;
 
 
 import com.edu.cqie.oj.domain.dto.ContestAddDto;
+import com.edu.cqie.oj.domain.dto.ContestUpdateDto;
 import com.edu.cqie.oj.domain.entity.ContestEntity;
 import com.edu.cqie.oj.domain.vo.ContestListVo;
 import com.mybatisflex.core.service.IService;
@@ -42,10 +43,10 @@ public interface IContestService extends IService<ContestEntity> {
     /**
      * 更新比赛
      *
-     * @param contest 比赛实体
+     * @param contestUpdateDto 比赛更新DTO
      * @return boolean
      */
-    boolean updateContest(ContestEntity contest);
+    boolean updateContest(ContestUpdateDto contestUpdateDto);
 
     /**
      * 删除比赛

@@ -50,24 +50,47 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
     public boolean addProblem(ProblemAddDto problemAddDto) {
         ProblemEntity problem = new ProblemEntity();
         BeanUtils.copyProperties(problemAddDto, problem);
-        
-        // 从UserContext获取当前用户ID作为创建者
+            
+        // 从 UserContext获取当前用户ID作为创建者
         Integer currentUserId = UserContext.getCurrentUserId();
         if (currentUserId == null) {
             throw new RuntimeException("未登录，请先登录");
         }
         problem.setCreatorId(currentUserId);
-        
-        problem.setCreatedAt(new Date());
-        problem.setUpdatedAt(new Date());
-        // 初始化提交次数和通过次数
-        if (problem.getSubmissionCount() == null) {
-            problem.setSubmissionCount(0);
+            
+        // 处理Hydro题目ID同步
+        // 如果没有指定hydroProblemId，默认使用本地题目ID（需要先保存获取ID）
+        String hydroProblemId = problemAddDto.getHydroProblemId();
+        if (hydroProblemId == null || hydroProblemId.isEmpty()) {
+            // 先保存获取自增ID
+            problem.setCreatedAt(new Date());
+            problem.setUpdatedAt(new Date());
+            if (problem.getSubmissionCount() == null) {
+                problem.setSubmissionCount(0);
+            }
+            if (problem.getAcceptedCount() == null) {
+                problem.setAcceptedCount(0);
+            }
+            boolean saved = save(problem);
+            if (!saved) {
+                throw new RuntimeException("题目保存失败");
+            }
+            // 使用本地ID作为Hydro题目ID
+            problem.setHydroProblemId(String.valueOf(problem.getId()));
+            return updateById(problem);
+        } else {
+            // 使用指定的Hydro题目ID
+            problem.setHydroProblemId(hydroProblemId);
+            problem.setCreatedAt(new Date());
+            problem.setUpdatedAt(new Date());
+            if (problem.getSubmissionCount() == null) {
+                problem.setSubmissionCount(0);
+            }
+            if (problem.getAcceptedCount() == null) {
+                problem.setAcceptedCount(0);
+            }
+            return save(problem);
         }
-        if (problem.getAcceptedCount() == null) {
-            problem.setAcceptedCount(0);
-        }
-        return save(problem);
     }
 
     /**
@@ -147,5 +170,28 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
         contestProblemMapper.deleteByQuery(contestProblemQuery);
         
         return removeById(id);
+    }
+
+    /**
+     * 同步题目的Hydro OJ ID
+     *
+     * @param problemId 本地题目ID
+     * @param hydroProblemId Hydro OJ题目ID
+     * @return boolean
+     */
+    @Override
+    public boolean syncHydroProblemId(Integer problemId, String hydroProblemId) {
+        if (problemId == null || hydroProblemId == null || hydroProblemId.isEmpty()) {
+            throw new RuntimeException("参数不能为空");
+        }
+        
+        ProblemEntity problem = getById(problemId);
+        if (problem == null) {
+            throw new RuntimeException("题目不存在");
+        }
+        
+        problem.setHydroProblemId(hydroProblemId);
+        problem.setUpdatedAt(new Date());
+        return updateById(problem);
     }
 }

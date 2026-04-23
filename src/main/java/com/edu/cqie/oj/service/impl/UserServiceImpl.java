@@ -14,11 +14,25 @@ import com.edu.cqie.oj.domain.dto.UserAddDto;
 import com.edu.cqie.oj.domain.entity.UserEntity;
 import com.edu.cqie.oj.domain.vo.UserListVo;
 import com.edu.cqie.oj.mapper.UserMapper;
+import com.edu.cqie.oj.mapper.UserRoleMapper;
+import com.edu.cqie.oj.mapper.RolePermissionMapper;
+import com.edu.cqie.oj.mapper.PermissionMapper;
+import com.edu.cqie.oj.mapper.RoleMapper;
+import com.edu.cqie.oj.domain.entity.UserRoleEntity;
+import com.edu.cqie.oj.domain.entity.RolePermissionEntity;
+import com.edu.cqie.oj.domain.entity.PermissionEntity;
+import com.edu.cqie.oj.domain.entity.RoleEntity;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 
+import jakarta.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.edu.cqie.oj.domain.entity.table.UserRoleEntityTableDef.USER_ROLE_ENTITY;
+import static com.edu.cqie.oj.domain.entity.table.RolePermissionEntityTableDef.ROLE_PERMISSION_ENTITY;
+import static com.edu.cqie.oj.domain.entity.table.PermissionEntityTableDef.PERMISSION_ENTITY;
 
 /**
  * 服务层实现。
@@ -28,6 +42,18 @@ import java.util.stream.Collectors;
  */
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> implements IUserService {
+
+    @Resource
+    private UserRoleMapper userRoleMapper;
+
+    @Resource
+    private RolePermissionMapper rolePermissionMapper;
+
+    @Resource
+    private PermissionMapper permissionMapper;
+
+    @Resource
+    private RoleMapper roleMapper;
 
     @Override
     public boolean addUser(UserAddDto userAddDto) {
@@ -91,7 +117,96 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         BeanUtils.copyProperties(user, loginVo);
         loginVo.setToken(token);
 
+        // 获取用户角色和权限
+        List<String> roleNames = getUserRoles(user.getId());
+        List<String> permissions = getUserPermissions(user.getId());
+        loginVo.setRoleNames(roleNames);
+        loginVo.setPermissions(permissions);
+
         return loginVo;
+    }
+
+    /**
+     * 获取用户的角色名称列表
+     *
+     * @param userId 用户ID
+     * @return 角色名称列表
+     */
+    private List<String> getUserRoles(Integer userId) {
+        QueryWrapper userRoleQuery = QueryWrapper.create()
+                .from(USER_ROLE_ENTITY)
+                .where(USER_ROLE_ENTITY.USER_ID.eq(userId));
+        List<UserRoleEntity> userRoles = userRoleMapper.selectListByQuery(userRoleQuery);
+
+        if (userRoles == null || userRoles.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 获取所有角色ID
+        List<Integer> roleIds = userRoles.stream()
+                .map(UserRoleEntity::getRoleId)
+                .collect(Collectors.toList());
+
+        // 查询角色详情
+        QueryWrapper roleQuery = QueryWrapper.create()
+                .from(com.edu.cqie.oj.domain.entity.table.RoleEntityTableDef.ROLE_ENTITY)
+                .where(com.edu.cqie.oj.domain.entity.table.RoleEntityTableDef.ROLE_ENTITY.ID.in(roleIds));
+        List<RoleEntity> roles = roleMapper.selectListByQuery(roleQuery);
+
+        // 返回角色名称列表
+        return roles.stream()
+                .map(RoleEntity::getRoleName)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取用户的所有权限代码
+     *
+     * @param userId 用户ID
+     * @return 权限代码列表
+     */
+    private List<String> getUserPermissions(Integer userId) {
+        // 查询用户的所有角色
+        QueryWrapper userRoleQuery = QueryWrapper.create()
+                .from(USER_ROLE_ENTITY)
+                .where(USER_ROLE_ENTITY.USER_ID.eq(userId));
+        List<UserRoleEntity> userRoles = userRoleMapper.selectListByQuery(userRoleQuery);
+
+        if (userRoles == null || userRoles.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 获取所有角色ID
+        List<Integer> roleIds = userRoles.stream()
+                .map(UserRoleEntity::getRoleId)
+                .collect(Collectors.toList());
+
+        // 查询这些角色的所有权限
+        QueryWrapper rolePermissionQuery = QueryWrapper.create()
+                .from(ROLE_PERMISSION_ENTITY)
+                .where(ROLE_PERMISSION_ENTITY.ROLE_ID.in(roleIds));
+        List<RolePermissionEntity> rolePermissions = rolePermissionMapper.selectListByQuery(rolePermissionQuery);
+
+        if (rolePermissions == null || rolePermissions.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 获取所有权限ID
+        List<Integer> permissionIds = rolePermissions.stream()
+                .map(RolePermissionEntity::getPermissionId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 查询权限详情
+        QueryWrapper permissionQuery = QueryWrapper.create()
+                .from(PERMISSION_ENTITY)
+                .where(PERMISSION_ENTITY.ID.in(permissionIds));
+        List<PermissionEntity> permissions = permissionMapper.selectListByQuery(permissionQuery);
+
+        // 返回权限代码列表
+        return permissions.stream()
+                .map(PermissionEntity::getPermissionCode)
+                .collect(Collectors.toList());
     }
 
     @Override

@@ -29,4 +29,9 @@ public class UserRoleVo {
      * 角色名称列表
      */
     private List<String> roleNames;
+    
+    /**
+     * 权限代码列表
+     */
+    private List<String> permissions;
 }

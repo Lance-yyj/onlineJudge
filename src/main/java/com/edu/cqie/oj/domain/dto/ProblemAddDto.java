@@ -72,4 +72,10 @@ public class ProblemAddDto {
      * 是否可见
      */
     private Integer visible;
+
+    /**
+     * Hydro OJ题目ID（用于判题系统同步，可选）
+     * 如果不填，默认使用本地题目ID
+     */
+    private String hydroProblemId;
 }

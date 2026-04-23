@@ -54,4 +54,13 @@ public interface IProblemService extends IService<ProblemEntity> {
      * @return boolean
      */
     boolean deleteProblem(Integer id);
+
+    /**
+     * 同步题目的Hydro OJ ID
+     *
+     * @param problemId 本地题目ID
+     * @param hydroProblemId Hydro OJ题目ID
+     * @return boolean
+     */
+    boolean syncHydroProblemId(Integer problemId, String hydroProblemId);
 }

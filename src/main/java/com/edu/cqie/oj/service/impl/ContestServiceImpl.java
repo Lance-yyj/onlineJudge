@@ -1,7 +1,10 @@
 package com.edu.cqie.oj.service.impl;
 
 
+import com.edu.cqie.oj.context.UserContext;
 import com.edu.cqie.oj.domain.dto.ContestAddDto;
+import com.edu.cqie.oj.domain.dto.ContestProblemAssignDto;
+import com.edu.cqie.oj.domain.dto.ContestUpdateDto;
 import com.edu.cqie.oj.domain.entity.ContestProblemEntity;
 import com.edu.cqie.oj.domain.entity.SubmissionEntity;
 import com.edu.cqie.oj.domain.vo.ContestListVo;
@@ -11,6 +14,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.edu.cqie.oj.service.IContestProblemService;
 import com.edu.cqie.oj.service.IContestService;
 import com.edu.cqie.oj.domain.entity.ContestEntity;
 import com.edu.cqie.oj.mapper.ContestMapper;
@@ -37,6 +41,9 @@ public class ContestServiceImpl extends ServiceImpl<ContestMapper, ContestEntity
     
     @Resource
     private SubmissionMapper submissionMapper;
+    
+    @Resource
+    private IContestProblemService contestProblemService;
 
     /**
      * 新增比赛
@@ -45,6 +52,7 @@ public class ContestServiceImpl extends ServiceImpl<ContestMapper, ContestEntity
      * @return boolean
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean addContest(ContestAddDto contestAddDto) {
         // 验证时间逻辑
         if (contestAddDto.getEndTime().before(contestAddDto.getStartTime())) {
@@ -57,11 +65,43 @@ public class ContestServiceImpl extends ServiceImpl<ContestMapper, ContestEntity
         
         ContestEntity contest = new ContestEntity();
         BeanUtils.copyProperties(contestAddDto, contest);
+        // 设置创建者ID为当前登录用户
+        Integer currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+        contest.setCreatorId(currentUserId);
         // 设置初始状态为未开始
         contest.setStatus(0);
         contest.setCreatedAt(new Date());
         contest.setUpdatedAt(new Date());
-        return save(contest);
+        
+        // 保存比赛
+        boolean result = save(contest);
+        
+        // 如果有题目列表，自动分配题目
+        if (result && contestAddDto.getProblems() != null && !contestAddDto.getProblems().isEmpty()) {
+            ContestProblemAssignDto assignDto = new ContestProblemAssignDto();
+            assignDto.setContestId(contest.getId());
+            
+            // 转换题目信息
+            List<ContestProblemAssignDto.ProblemInfo> problemInfos = contestAddDto.getProblems().stream()
+                .map(dto -> {
+                    ContestProblemAssignDto.ProblemInfo info = new ContestProblemAssignDto.ProblemInfo();
+                    info.setProblemId(dto.getProblemId());
+                    info.setProblemOrder(dto.getProblemOrder());
+                    info.setScore(dto.getScore());
+                    return info;
+                })
+                .collect(Collectors.toList());
+            
+            assignDto.setProblems(problemInfos);
+            
+            // 分配题目
+            contestProblemService.assignProblems(assignDto);
+        }
+        
+        return result;
     }
 
     /**
@@ -120,13 +160,47 @@ public class ContestServiceImpl extends ServiceImpl<ContestMapper, ContestEntity
     /**
      * 更新比赛
      *
-     * @param contest 比赛实体
+     * @param contestUpdateDto 比赛更新DTO
      * @return boolean
      */
     @Override
-    public boolean updateContest(ContestEntity contest) {
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateContest(ContestUpdateDto contestUpdateDto) {
+        // 验证时间逻辑
+        if (contestUpdateDto.getEndTime().before(contestUpdateDto.getStartTime())) {
+            throw new RuntimeException("结束时间不能早于开始时间");
+        }
+        
+        ContestEntity contest = new ContestEntity();
+        BeanUtils.copyProperties(contestUpdateDto, contest);
         contest.setUpdatedAt(new Date());
-        return updateById(contest);
+        
+        // 更新比赛基本信息
+        boolean result = updateById(contest);
+        
+        // 如果有题目列表，更新题目关联
+        if (result && contestUpdateDto.getProblems() != null) {
+            ContestProblemAssignDto assignDto = new ContestProblemAssignDto();
+            assignDto.setContestId(contest.getId());
+            
+            // 转换题目信息
+            List<ContestProblemAssignDto.ProblemInfo> problemInfos = contestUpdateDto.getProblems().stream()
+                .map(dto -> {
+                    ContestProblemAssignDto.ProblemInfo info = new ContestProblemAssignDto.ProblemInfo();
+                    info.setProblemId(dto.getProblemId());
+                    info.setProblemOrder(dto.getProblemOrder());
+                    info.setScore(dto.getScore());
+                    return info;
+                })
+                .collect(Collectors.toList());
+            
+            assignDto.setProblems(problemInfos);
+            
+            // 分配题目（会先删除旧的再添加新的）
+            contestProblemService.assignProblems(assignDto);
+        }
+        
+        return result;
     }
 
     /**

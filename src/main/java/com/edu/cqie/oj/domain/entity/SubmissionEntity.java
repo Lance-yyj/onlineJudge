@@ -76,10 +76,10 @@ public class SubmissionEntity {
     private Integer executeMemory;
 
     /**
-     * 判题结果详情
+     * 判题结果详情（JSON格式字符串）
      */
     @Column(value = "judge_result")
-    private Object judgeResult;
+    private String judgeResult;
 
     /**
      * 外部判题机提交ID

@@ -62,10 +62,10 @@ public interface ISubmissionService extends IService<SubmissionEntity> {
      * @param status 状态
      * @param executeTime 执行时间
      * @param executeMemory 内存使用
-     * @param judgeResult 判题结果
+     * @param judgeResult 判题结果（JSON格式字符串）
      * @return boolean
      */
-    boolean updateSubmissionStatus(Integer id, Integer status, Integer executeTime, Integer executeMemory, Object judgeResult);
+    boolean updateSubmissionStatus(Integer id, Integer status, Integer executeTime, Integer executeMemory, String judgeResult);
 
     /**
      * 删除提交记录
