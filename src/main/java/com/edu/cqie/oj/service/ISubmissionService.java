@@ -74,4 +74,19 @@ public interface ISubmissionService extends IService<SubmissionEntity> {
      * @return boolean
      */
     boolean deleteSubmission(Integer id);
+
+    /**
+     * 同步单个提交的判题结果
+     *
+     * @param submissionId 提交记录ID
+     * @return boolean
+     */
+    boolean syncJudgeResult(Integer submissionId);
+
+    /**
+     * 同步所有等待中的提交记录
+     *
+     * @return 同步成功的数量
+     */
+    int syncAllPendingSubmissions();
 }

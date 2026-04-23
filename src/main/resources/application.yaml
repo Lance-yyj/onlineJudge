@@ -10,17 +10,21 @@ spring:
 # 可选：启用SQL日志
 logging:
   level:
-    com.clzj.clzjhome: DEBUG
+    com.edu.cqie.oj: DEBUG
     org.mybatis: DEBUG
 
 # HydroOJ 判题系统配置
 hydro:
   judge:
-    # HydroOJ API 基础URL（根据实际部署地址修改）
-    # 注意：Docker容器中8888端口映射到宿主机80端口
-    base-url: http://localhost:80
+    # HydroOJ API 基础URL
+    # Java 应用运行在宿主机上，直接使用 localhost
+    base-url: http://127.0.0.1:80
     # API Token（如果HydroOJ不需要认证，可以留空）
     api-token: ""
+    # Hydro 用户名（用于登录认证）
+    username: "yyj"
+    # Hydro 密码（用于登录认证）
+    password: "yyj123"
     # 连接超时时间（毫秒）
     connect-timeout: 5000
     # 读取超时时间（毫秒）

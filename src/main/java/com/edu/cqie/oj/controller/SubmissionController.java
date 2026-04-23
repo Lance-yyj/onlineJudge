@@ -141,4 +141,32 @@ public class SubmissionController extends BaseController{
         boolean result = submissionService.deleteSubmission(id);
         return Result.success(result);
     }
+
+    /**
+     * 查询提交判题状态
+     *
+     * @param id 提交记录ID
+     * @return Result<SubmissionListVo>
+     */
+    @GetMapping("/getSubmissionStatus")
+    @RequiresPermission("submission:view")
+    public Result<SubmissionListVo> getSubmissionStatus(Integer id) {
+        // 先同步最新状态
+        submissionService.syncJudgeResult(id);
+        // 返回最新状态
+        SubmissionListVo vo = submissionService.getSubmissionById(id);
+        return Result.success(vo);
+    }
+
+    /**
+     * 手动触发同步所有等待中的提交记录
+     *
+     * @return Result<String>
+     */
+    @PostMapping("/syncPendingSubmissions")
+    @RequiresPermission("submission:update")
+    public Result<String> syncPendingSubmissions() {
+        int count = submissionService.syncAllPendingSubmissions();
+        return Result.success("已同步 " + count + " 条提交记录");
+    }
 }

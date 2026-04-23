@@ -26,6 +26,16 @@ public class HydroJudgeConfig {
     private String apiToken = "";
 
     /**
+     * Hydro 用户名（用于登录）
+     */
+    private String username = "";
+
+    /**
+     * Hydro 密码（用于登录）
+     */
+    private String password = "";
+
+    /**
      * 连接超时时间（毫秒）
      */
     private int connectTimeout = 5000;

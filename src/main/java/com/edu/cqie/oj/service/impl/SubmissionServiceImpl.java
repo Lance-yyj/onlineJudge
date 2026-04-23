@@ -27,6 +27,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.scheduling.annotation.Scheduled;
+
 import static com.edu.cqie.oj.domain.entity.table.SubmissionEntityTableDef.SUBMISSION_ENTITY;
 
 /**
@@ -58,6 +60,7 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
      * @return boolean
      */
     @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public boolean addSubmission(SubmissionAddDto submissionAddDto) {
         // 验证题目是否存在
         ProblemEntity problem = problemMapper.selectOneById(submissionAddDto.getProblemId());
@@ -94,23 +97,19 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
         
         SubmissionEntity submission = new SubmissionEntity();
         BeanUtils.copyProperties(submissionAddDto, submission);
-        // 设置初始状态为等待中
-        submission.setStatus(0);
+        // 设置初始状态为判题中
+        submission.setStatus(1);
         submission.setSubmittedAt(new Date());
         
-        // 先保存提交记录
+        // 保存提交记录
         boolean saved = save(submission);
         if (!saved) {
             log.error("保存提交记录失败");
             return false;
         }
         
-        // 异步提交到 HydroOJ 进行判题
+        // 提交到 HydroOJ 进行判题
         try {
-            // 更新状态为判题中
-            submission.setStatus(1);
-            updateById(submission);
-            
             // 调用 HydroOJ API 提交代码
             String pid = String.valueOf(submission.getProblemId());
             HydroJudgeResponse response = hydroJudgeService.submitCode(
@@ -126,9 +125,10 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
             log.info("提交到 HydroOJ 成功，externalSubmissionId={}", response.getRid());
             
         } catch (Exception e) {
-            log.error("提交到 HydroOJ 失败", e);
-            // 即使判题提交失败，也保留本地记录，状态设为失败
+            log.error("提交到 HydroOJ 失败，将状态设为失败", e);
+            // 提交失败，设置为失败状态
             submission.setStatus(3);
+            submission.setJudgeResult("提交到判题系统失败: " + e.getMessage());
             updateById(submission);
         }
         
@@ -293,6 +293,7 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
      * @param submissionId 本地提交记录ID
      * @return boolean
      */
+    @Override
     public boolean syncJudgeResult(Integer submissionId) {
         SubmissionEntity submission = getById(submissionId);
         if (submission == null) {
@@ -305,36 +306,116 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
             return false;
         }
 
+        // 如果已经判题完成，不需要同步
+        if (submission.getStatus() != null && (submission.getStatus() == 2 || submission.getStatus() == 3)) {
+            log.debug("提交已判题完成，无需同步: id={}, status={}", submissionId, submission.getStatus());
+            return true;
+        }
+
         try {
             // 查询 HydroOJ 判题状态
             com.edu.cqie.oj.domain.dto.HydroStatusResponse statusResponse = 
                     hydroJudgeService.querySubmissionStatus(submission.getExternalSubmissionId());
 
-            // 如果判题已完成，更新本地状态
-            if (statusResponse.getCompleted() != null && statusResponse.getCompleted()) {
-                Integer localStatus = hydroJudgeService.convertToLocalStatus(statusResponse.getStatus());
-                
-                submission.setStatus(localStatus);
-                if (statusResponse.getTime() != null) {
-                    submission.setExecuteTime(statusResponse.getTime().intValue());
-                }
-                if (statusResponse.getMemory() != null) {
-                    submission.setExecuteMemory(statusResponse.getMemory().intValue());
-                }
-                
-                // 保存判题详情
-                submission.setJudgeResult(statusResponse);
-                
-                updateById(submission);
-                log.info("同步判题结果成功: id={}, status={}", submissionId, localStatus);
-                return true;
-            } else {
-                log.info("判题尚未完成: id={}", submissionId);
-                return false;
+            // 转换状态码
+            Integer localStatus = hydroJudgeService.convertToLocalStatus(statusResponse.getStatus());
+            
+            // 更新状态
+            submission.setStatus(localStatus);
+            
+            // 更新执行时间和内存（如果有）
+            if (statusResponse.getTime() != null) {
+                submission.setExecuteTime(statusResponse.getTime().intValue());
             }
+            if (statusResponse.getMemory() != null) {
+                submission.setExecuteMemory(statusResponse.getMemory().intValue());
+            }
+            
+            // 保存判题详情（转换为 JSON 字符串）
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            String judgeResultJson = objectMapper.writeValueAsString(statusResponse);
+            submission.setJudgeResult(judgeResultJson);
+            
+            updateById(submission);
+            log.info("同步判题结果成功: id={}, status={}, time={}, memory={}", 
+                submissionId, localStatus, statusResponse.getTime(), statusResponse.getMemory());
+            return true;
         } catch (Exception e) {
             log.error("同步判题结果失败: id={}", submissionId, e);
             return false;
+        }
+    }
+
+    /**
+     * 同步所有等待中的提交记录
+     *
+     * @return 同步成功的数量
+     */
+    @Override
+    public int syncAllPendingSubmissions() {
+        // 查询所有等待中或判题中的提交记录
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .where(SUBMISSION_ENTITY.STATUS.in(0, 1))
+                .and(SUBMISSION_ENTITY.EXTERNAL_SUBMISSION_ID.isNotNull())
+                .orderBy(SUBMISSION_ENTITY.SUBMITTED_AT.asc());
+        
+        List<SubmissionEntity> pendingSubmissions = list(queryWrapper);
+        log.info("找到 {} 条待同步的提交记录", pendingSubmissions.size());
+        
+        int successCount = 0;
+        for (SubmissionEntity submission : pendingSubmissions) {
+            try {
+                if (syncJudgeResult(submission.getId())) {
+                    successCount++;
+                }
+            } catch (Exception e) {
+                log.error("同步提交记录失败: id={}", submission.getId(), e);
+            }
+        }
+        
+        log.info("同步完成: 成功 {}/{}", successCount, pendingSubmissions.size());
+        return successCount;
+    }
+
+    /**
+     * 定时任务：每5秒自动同步一次所有等待中的提交记录
+     * 此方法会自动执行，无需手动调用
+     */
+    @Scheduled(fixedDelay = 5000) // 每次执行完成后间隔5秒
+    public void autoSyncPendingSubmissions() {
+        try {
+            // 查询所有等待中或判题中的提交记录（只查最近30分钟内的，避免处理太旧的记录）
+            Date thirtyMinutesAgo = new Date(System.currentTimeMillis() - 30 * 60 * 1000);
+            QueryWrapper queryWrapper = QueryWrapper.create()
+                    .where(SUBMISSION_ENTITY.STATUS.in(0, 1))
+                    .and(SUBMISSION_ENTITY.EXTERNAL_SUBMISSION_ID.isNotNull())
+                    .and(SUBMISSION_ENTITY.SUBMITTED_AT.ge(thirtyMinutesAgo))
+                    .orderBy(SUBMISSION_ENTITY.SUBMITTED_AT.asc());
+            
+            List<SubmissionEntity> pendingSubmissions = list(queryWrapper);
+            
+            if (pendingSubmissions.isEmpty()) {
+                return; // 没有待同步的记录，直接返回
+            }
+            
+            log.debug("定时任务开始同步 {} 条待判题记录", pendingSubmissions.size());
+            
+            int successCount = 0;
+            for (SubmissionEntity submission : pendingSubmissions) {
+                try {
+                    if (syncJudgeResult(submission.getId())) {
+                        successCount++;
+                    }
+                } catch (Exception e) {
+                    log.error("定时任务同步失败: id={}", submission.getId(), e);
+                }
+            }
+            
+            if (successCount > 0) {
+                log.info("定时任务同步完成: 成功 {}/{}", successCount, pendingSubmissions.size());
+            }
+        } catch (Exception e) {
+            log.error("定时任务执行异常", e);
         }
     }
 }

@@ -2,6 +2,8 @@ package com.edu.cqie.oj.domain.dto;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 /**
  * HydroOJ 提交状态查询响应DTO
  *
@@ -9,7 +11,9 @@ import lombok.Data;
  * @since 1.0
  */
 @Data
-public class HydroStatusResponse {
+public class HydroStatusResponse implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
 
     /**
      * 提交ID
