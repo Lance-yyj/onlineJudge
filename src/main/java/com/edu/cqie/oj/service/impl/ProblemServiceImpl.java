@@ -1,6 +1,7 @@
 package com.edu.cqie.oj.service.impl;
 
 
+import com.alibaba.fastjson2.JSON;
 import com.edu.cqie.oj.context.UserContext;
 import com.edu.cqie.oj.domain.dto.ProblemAddDto;
 import com.edu.cqie.oj.domain.entity.ContestProblemEntity;
@@ -10,6 +11,7 @@ import com.edu.cqie.oj.mapper.ContestProblemMapper;
 import com.edu.cqie.oj.mapper.SubmissionMapper;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.edu.cqie.oj.service.IProblemService;
@@ -20,6 +22,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.edu.cqie.oj.domain.entity.table.ProblemEntityTableDef.PROBLEM_ENTITY;
@@ -39,6 +42,13 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
     
     @Resource
     private ContestProblemMapper contestProblemMapper;
+    
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
+    
+    // Redis缓存键名和过期时间（秒）
+    private static final String PROBLEM_LIST_CACHE_KEY = "problem:list";
+    private static final long CACHE_EXPIRE_TIME = 300; // 5分钟
 
     /**
      * 新增题目
@@ -77,7 +87,10 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
             }
             // 使用本地ID作为Hydro题目ID
             problem.setHydroProblemId(String.valueOf(problem.getId()));
-            return updateById(problem);
+            boolean updated = updateById(problem);
+            // 清除缓存
+            clearProblemListCache();
+            return updated;
         } else {
             // 使用指定的Hydro题目ID
             problem.setHydroProblemId(hydroProblemId);
@@ -89,7 +102,12 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
             if (problem.getAcceptedCount() == null) {
                 problem.setAcceptedCount(0);
             }
-            return save(problem);
+            boolean saved = save(problem);
+            // 清除缓存
+            if (saved) {
+                clearProblemListCache();
+            }
+            return saved;
         }
     }
 
@@ -100,6 +118,20 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
      */
     @Override
     public List<ProblemListVo> getProblemList() {
+        // 尝试从Redis缓存中获取
+        try {
+            Object cachedData = redisTemplate.opsForValue().get(PROBLEM_LIST_CACHE_KEY);
+            if (cachedData != null) {
+                // 如果缓存中存在，直接返回
+                String jsonStr = cachedData.toString();
+                return JSON.parseArray(jsonStr, ProblemListVo.class);
+            }
+        } catch (Exception e) {
+            // Redis异常时记录日志但不影响业务，继续从数据库查询
+            System.err.println("Redis缓存读取失败: " + e.getMessage());
+        }
+        
+        // 缓存中没有数据，从数据库查询
         // 获取当前用户
         UserContext.UserInfo currentUser = UserContext.getCurrentUser();
         
@@ -111,11 +143,22 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
         }
         
         List<ProblemEntity> list = list(queryWrapper);
-        return list.stream().map(entity -> {
+        List<ProblemListVo> result = list.stream().map(entity -> {
             ProblemListVo vo = new ProblemListVo();
             BeanUtils.copyProperties(entity, vo);
             return vo;
         }).collect(Collectors.toList());
+        
+        // 将查询结果存入Redis缓存
+        try {
+            String jsonStr = JSON.toJSONString(result);
+            redisTemplate.opsForValue().set(PROBLEM_LIST_CACHE_KEY, jsonStr, CACHE_EXPIRE_TIME, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            // Redis异常时记录日志但不影响业务
+            System.err.println("Redis缓存写入失败: " + e.getMessage());
+        }
+        
+        return result;
     }
 
     /**
@@ -144,7 +187,12 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
     @Override
     public boolean updateProblem(ProblemEntity problem) {
         problem.setUpdatedAt(new Date());
-        return updateById(problem);
+        boolean updated = updateById(problem);
+        // 清除缓存
+        if (updated) {
+            clearProblemListCache();
+        }
+        return updated;
     }
 
     /**
@@ -169,7 +217,12 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
             .where("problem_id = ?", id);
         contestProblemMapper.deleteByQuery(contestProblemQuery);
         
-        return removeById(id);
+        boolean deleted = removeById(id);
+        // 清除缓存
+        if (deleted) {
+            clearProblemListCache();
+        }
+        return deleted;
     }
 
     /**
@@ -192,6 +245,23 @@ public class ProblemServiceImpl extends ServiceImpl<ProblemMapper, ProblemEntity
         
         problem.setHydroProblemId(hydroProblemId);
         problem.setUpdatedAt(new Date());
-        return updateById(problem);
+        boolean updated = updateById(problem);
+        // 清除缓存
+        if (updated) {
+            clearProblemListCache();
+        }
+        return updated;
+    }
+    
+    /**
+     * 清除题目列表缓存
+     */
+    private void clearProblemListCache() {
+        try {
+            redisTemplate.delete(PROBLEM_LIST_CACHE_KEY);
+        } catch (Exception e) {
+            // Redis异常时记录日志但不影响业务
+            System.err.println("Redis缓存清除失败: " + e.getMessage());
+        }
     }
 }
