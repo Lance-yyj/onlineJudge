@@ -5,6 +5,7 @@ import com.edu.cqie.oj.context.UserContext;
 import com.edu.cqie.oj.domain.Result;
 import com.edu.cqie.oj.domain.dto.SubmissionAddDto;
 import com.edu.cqie.oj.domain.vo.SubmissionListVo;
+import com.edu.cqie.oj.domain.vo.UserStatsVo;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -168,5 +169,32 @@ public class SubmissionController extends BaseController{
     public Result<String> syncPendingSubmissions() {
         int count = submissionService.syncAllPendingSubmissions();
         return Result.success("已同步 " + count + " 条提交记录");
+    }
+
+    /**
+     * 获取提交总数
+     *
+     * @return Result<Long>
+     */
+    @GetMapping("/getSubmissionCount")
+    @RequiresPermission("submission:list")
+    public Result<Long> getSubmissionCount() {
+        long count = submissionService.count();
+        return Result.success(count);
+    }
+
+    /**
+     * 获取用户统计数据
+     *
+     * @return Result<UserStatsVo>
+     */
+    @GetMapping("/getUserStats")
+    public Result<UserStatsVo> getUserStats() {
+        Integer userId = UserContext.getCurrentUserId();
+        if (userId == null) {
+            return Result.error("未登录，请先登录");
+        }
+        UserStatsVo stats = submissionService.getUserStats(userId);
+        return Result.success(stats);
     }
 }

@@ -108,4 +108,16 @@ public class ContestController extends BaseController{
         boolean result = contestService.deleteContest(id);
         return Result.success(result);
     }
+
+    /**
+     * 获取比赛总数
+     *
+     * @return Result<Long>
+     */
+    @GetMapping("/getContestCount")
+    @RequiresPermission("contest:list")
+    public Result<Long> getContestCount() {
+        long count = contestService.count();
+        return Result.success(count);
+    }
 }

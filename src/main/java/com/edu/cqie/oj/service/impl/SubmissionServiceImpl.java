@@ -8,6 +8,7 @@ import com.edu.cqie.oj.domain.entity.ContestEntity;
 import com.edu.cqie.oj.domain.entity.ContestProblemEntity;
 import com.edu.cqie.oj.domain.entity.ProblemEntity;
 import com.edu.cqie.oj.domain.vo.SubmissionListVo;
+import com.edu.cqie.oj.domain.vo.UserStatsVo;
 import com.edu.cqie.oj.mapper.ContestMapper;
 import com.edu.cqie.oj.mapper.ContestProblemMapper;
 import com.edu.cqie.oj.mapper.ProblemMapper;
@@ -224,6 +225,51 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
     }
 
     /**
+     * 获取用户统计数据
+     *
+     * @param userId 用户ID
+     * @return UserStatsVo
+     */
+    @Override
+    public UserStatsVo getUserStats(Integer userId) {
+        UserStatsVo stats = new UserStatsVo();
+        
+        // 获取提交总数
+        QueryWrapper totalQuery = QueryWrapper.create()
+                .where(SUBMISSION_ENTITY.USER_ID.eq(userId));
+        long totalSubmissions = count(totalQuery);
+        stats.setTotalSubmissions(totalSubmissions);
+        
+        // 获取通过题目数（不同的题目ID，且状态为通过）
+        QueryWrapper acceptedQuery = QueryWrapper.create()
+                .select(SUBMISSION_ENTITY.PROBLEM_ID)
+                .where(SUBMISSION_ENTITY.USER_ID.eq(userId))
+                .and(SUBMISSION_ENTITY.STATUS.eq(2))
+                .groupBy(SUBMISSION_ENTITY.PROBLEM_ID);
+        List<SubmissionEntity> acceptedList = list(acceptedQuery);
+        stats.setAcceptedProblems((long) acceptedList.size());
+        
+        // 计算通过率
+        if (totalSubmissions > 0) {
+            double rate = (acceptedList.size() * 100.0) / totalSubmissions;
+            stats.setPassRate(String.format("%.1f%%", rate));
+        } else {
+            stats.setPassRate("0%");
+        }
+        
+        // 获取参与比赛数（不同的比赛ID）
+        QueryWrapper contestQuery = QueryWrapper.create()
+                .select(SUBMISSION_ENTITY.CONTEST_ID)
+                .where(SUBMISSION_ENTITY.USER_ID.eq(userId))
+                .and(SUBMISSION_ENTITY.CONTEST_ID.isNotNull())
+                .groupBy(SUBMISSION_ENTITY.CONTEST_ID);
+        List<SubmissionEntity> contestList = list(contestQuery);
+        stats.setContestCount((long) contestList.size());
+        
+        return stats;
+    }
+
+    /**
      * 更新提交记录状态
      *
      * @param id 提交记录ID
@@ -328,6 +374,9 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
             // 转换状态码
             Integer localStatus = hydroJudgeService.convertToLocalStatus(statusResponse.getStatus());
             
+            // 保存旧状态（在更新之前）
+            Integer oldStatus = submission.getStatus();
+            
             // 更新状态
             submission.setStatus(localStatus);
             
@@ -345,6 +394,41 @@ public class SubmissionServiceImpl extends ServiceImpl<SubmissionMapper, Submiss
             submission.setJudgeResult(judgeResultJson);
             
             updateById(submission);
+            
+            // 更新题目统计信息
+            log.debug("检查是否需要更新统计: submissionId={}, oldStatus={}, localStatus={}", 
+                    submissionId, oldStatus, localStatus);
+            
+            if (oldStatus != localStatus) {
+                ProblemEntity problem = problemMapper.selectOneById(submission.getProblemId());
+                if (problem != null) {
+                    boolean needUpdate = false;
+                    
+                    log.debug("当前题目统计: problemId={}, submissionCount={}, acceptedCount={}",
+                            problem.getId(), problem.getSubmissionCount(), problem.getAcceptedCount());
+                    
+                    // 增加提交次数（只在首次判题完成时增加）
+                    if ((oldStatus == 0 || oldStatus == 1) && (localStatus == 2 || localStatus == 3)) {
+                        problem.setSubmissionCount(problem.getSubmissionCount() + 1);
+                        needUpdate = true;
+                        log.debug("增加提交次数: {} -> {}", problem.getSubmissionCount() - 1, problem.getSubmissionCount());
+                    }
+                    
+                    // 如果从不通过变为通过，增加通过次数
+                    if (localStatus == 2 && (oldStatus == 0 || oldStatus == 1 || oldStatus == 3)) {
+                        problem.setAcceptedCount(problem.getAcceptedCount() + 1);
+                        needUpdate = true;
+                        log.debug("增加通过次数: {} -> {}", problem.getAcceptedCount() - 1, problem.getAcceptedCount());
+                    }
+                    
+                    if (needUpdate) {
+                        problemMapper.update(problem);
+                        log.info("更新题目统计: problemId={}, submissionCount={}, acceptedCount={}", 
+                                problem.getId(), problem.getSubmissionCount(), problem.getAcceptedCount());
+                    }
+                }
+            }
+            
             log.info("同步判题结果成功: id={}, status={}, time={}, memory={}", 
                 submissionId, localStatus, statusResponse.getTime(), statusResponse.getMemory());
             return true;

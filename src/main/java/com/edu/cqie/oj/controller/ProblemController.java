@@ -106,4 +106,16 @@ public class ProblemController extends BaseController{
         boolean result = problemService.syncHydroProblemId(problemId, hydroProblemId);
         return Result.success(result);
     }
+
+    /**
+     * 获取题目总数
+     *
+     * @return Result<Long>
+     */
+    @GetMapping("/getProblemCount")
+    @RequiresPermission("problem:list")
+    public Result<Long> getProblemCount() {
+        long count = problemService.count();
+        return Result.success(count);
+    }
 }

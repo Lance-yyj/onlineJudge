@@ -4,6 +4,7 @@ package com.edu.cqie.oj.service;
 import com.edu.cqie.oj.domain.dto.SubmissionAddDto;
 import com.edu.cqie.oj.domain.entity.SubmissionEntity;
 import com.edu.cqie.oj.domain.vo.SubmissionListVo;
+import com.edu.cqie.oj.domain.vo.UserStatsVo;
 import com.mybatisflex.core.service.IService;
 
 import java.util.List;
@@ -54,6 +55,14 @@ public interface ISubmissionService extends IService<SubmissionEntity> {
      * @return List<SubmissionListVo>
      */
     List<SubmissionListVo> getSubmissionByProblemId(Integer problemId);
+
+    /**
+     * 获取用户统计数据
+     *
+     * @param userId 用户ID
+     * @return UserStatsVo 用户统计数据
+     */
+    UserStatsVo getUserStats(Integer userId);
 
     /**
      * 更新提交记录状态

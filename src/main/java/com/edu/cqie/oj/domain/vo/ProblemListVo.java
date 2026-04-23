@@ -82,6 +82,11 @@ public class ProblemListVo {
     private Integer visible;
 
     /**
+     * Hydro OJ题目ID
+     */
+    private String hydroProblemId;
+
+    /**
      * 提交次数
      */
     private Integer submissionCount;

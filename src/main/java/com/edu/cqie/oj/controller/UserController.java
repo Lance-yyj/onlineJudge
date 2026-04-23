@@ -125,4 +125,16 @@ public class UserController extends BaseController{
         boolean result = userRoleService.removeUserRole(userId, roleId);
         return Result.success("移除角色成功", result);
     }
+
+    /**
+     * 获取用户总数
+     *
+     * @return Result<Long>
+     */
+    @GetMapping("/getUserCount")
+    @RequiresPermission("user:list")
+    public Result<Long> getUserCount() {
+        long count = userService.count();
+        return Result.success(count);
+    }
 }
